@@ -14,7 +14,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
+
       if (!response.ok) {
         throw new Error('Login failed');
       }
@@ -27,10 +27,28 @@ function App() {
     }
   };
 
+  const handleRegister = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!response.ok) {
+        throw new Error('Registration failed');
+      }
+
+      alert('Registration successful! You can now login.');
+    } catch (error) {
+      alert(error.message || 'Registration failed!');
+    }
+  };
+
   const handleLogout = () => {
-    localStorage.removeItem('access_token');  // Remove token
-    setAuthenticated(false);  // Update authentication state
-    setData(null);  // Clear fetched data
+    localStorage.removeItem('access_token');
+    setAuthenticated(false);
+    setData(null);
   };
 
   const fetchData = async () => {
@@ -39,9 +57,9 @@ function App() {
       const response = await fetch('http://localhost:3002/data', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (!response.ok) {
-        if (response.status === 401) {  // Unauthorized
+        if (response.status === 401) {
           handleLogout();
           alert('Session expired. Please login again.');
           return;
@@ -57,21 +75,22 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        {isAuthenticated ?
-          <>
-            {data ? <p>{data}</p> : <button onClick={fetchData}>Fetch Data</button>}
-            <button onClick={handleLogout}>Logout</button>
-          </> :
-          (<div className="login-container">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input-field" />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input-field" />
-            <button onClick={handleLogin} className="login-button">Login</button>
-          </div>)
-        }
-      </header>
-    </div>
+      <div className="App">
+        <header className="App-header">
+          {isAuthenticated ?
+              <>
+                {data ? <p>{data}</p> : <button onClick={fetchData}>Fetch Data</button>}
+                <button onClick={handleLogout}>Logout</button>
+              </> :
+              (<div className="auth-container">
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input-field" />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input-field" />
+                <button onClick={handleLogin} className="auth-button">Login</button>
+                <button onClick={handleRegister} className="auth-button">Register</button>
+              </div>)
+          }
+        </header>
+      </div>
   );
 }
 
