@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import CookieConsent from 'react-cookie-consent';
 import './App.css';
 
 function App() {
@@ -6,42 +7,39 @@ function App() {
   const [password, setPassword] = useState('');
   const [data, setData] = useState(null);
   const [isAuthenticated, setAuthenticated] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
 
-  const handleLogin = async () => {
+  useEffect(() => {
+    // Check if the user has given consent
+    const consentStatus = localStorage.getItem('cookie_consent');
+    if (consentStatus === 'true') {
+      setConsentGiven(true);
+    }
+  }, []);
+
+  const fetchData = async () => {
     try {
-      const response = await fetch('http://localhost:3001/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://localhost:3002/data/users', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
-
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
 
       const result = await response.json();
-      localStorage.setItem('access_token', result.token);
-      setAuthenticated(true);
-    } catch (error) {
-      alert(error.message || 'Login failed!');
-    }
-  };
-
-  const handleRegister = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        throw new Error(result.message || 'Failed to fetch data from backend');
       }
 
-      alert('Registration successful! You can now login.');
+      setData(result);
     } catch (error) {
-      alert(error.message || 'Registration failed!');
+      if (error.message === 'Unauthorized') {
+        handleLogout();
+        alert('Session expired. Please login again.');
+      } else {
+        alert(error.message);
+      }
     }
   };
 
@@ -51,44 +49,110 @@ function App() {
     setData(null);
   };
 
-  const fetchData = async () => {
+
+  const handleLogin = async () => {
+    // Check if consent is given before allowing login
+    if (!consentGiven) {
+      alert('Please give consent to cookies before logging in.');
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:3002/data', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch('http://localhost:3001/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        if (response.status === 401) {
-          handleLogout();
-          alert('Session expired. Please login again.');
-          return;
-        }
-        throw new Error('Failed to fetch data from backend');
+        throw new Error(result.message || 'Login failed');
       }
 
-      const result = await response.json();
-      setData(result.data);
+      localStorage.setItem('access_token', result.token);
+      setAuthenticated(true);
     } catch (error) {
-      alert(error.message || 'Failed to fetch data');
+      alert(error.message);
     }
   };
 
+  const handleRegister = async () => {
+    // Check if consent is given before allowing registration
+    if (!consentGiven) {
+      alert('Please give consent to cookies before registering.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Registration failed');
+      }
+
+      alert('Registration successful! You can now login.');
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  // Rest of your code remains unchanged
+
   return (
       <div className="App">
-        <header className="App-header">
-          {isAuthenticated ?
+        <CookieConsent
+            location="bottom"
+            buttonText={
               <>
-                {data ? <p>{data}</p> : <button onClick={fetchData}>Fetch Data</button>}
+                I Consent
+                <a href="/gdpr-info" style={{ marginLeft: '5px', textDecoration: 'underline' }}>
+                  Learn More
+                </a>
+              </>
+            }
+            cookieName="gdpr-consent"
+            style={{ background: '#2B373B' }}
+            buttonStyle={{ color: '#4e503b', fontSize: '13px' }}
+            expires={150}
+            enableDeclineButton
+            onAccept={() => {
+              localStorage.setItem('cookie_consent', 'true');
+              setConsentGiven(true);
+            }}
+            onDecline={() => {
+              localStorage.setItem('cookie_consent', 'false');
+              setConsentGiven(false);
+            }}
+        >
+          This website uses cookies to enhance the user experience.{' '}
+          <span style={{ fontSize: '6px' }}>By consenting your revoke all right to your first born!</span>
+        </CookieConsent>
+
+        <header className="App-header">
+          {isAuthenticated ? (
+              <>
+                {data ? <p>{JSON.stringify(data)}</p> : <button onClick={fetchData}>Fetch Data</button>}
                 <button onClick={handleLogout}>Logout</button>
-              </> :
-              (<div className="auth-container">
+              </>
+          ) : (
+              <div className="auth-container">
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input-field" />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input-field" />
-                <button onClick={handleLogin} className="auth-button">Login</button>
-                <button onClick={handleRegister} className="auth-button">Register</button>
-              </div>)
-          }
+                <button onClick={handleLogin} className="auth-button" disabled={!consentGiven}>
+                  Login
+                </button>
+                <button onClick={handleRegister} className="auth-button" disabled={!consentGiven}>
+                  Register
+                </button>
+              </div>
+          )}
         </header>
       </div>
   );
